@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - SSC CGL AI Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: var(--bg-color);
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .login-card {
+            background-color: var(--card-bg);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-card h1 {
+            color: var(--primary-neon);
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px var(--primary-dim);
+        }
+        .login-card p {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            color: var(--text-main);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            background-color: rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .input-group input:focus {
+            border-color: var(--primary-neon);
+            box-shadow: 0 0 5px var(--primary-dim);
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: transparent;
+            color: var(--primary-neon);
+            border: 1px solid var(--primary-neon);
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        .login-btn:hover {
+            background-color: var(--primary-neon);
+            color: var(--bg-color);
+            box-shadow: 0 0 15px var(--primary-neon);
+        }
+        #login-error {
+            color: #ff4444;
+            font-size: 13px;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>SSC CGL AI</h1>
+        <p>Income Tax Inspector Preparation System</p>
+        
+        <form id="login-form">
+            <div class="input-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="student@ssc.gov.in" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter any password to demo" required>
+            </div>
+            <button type="submit" class="login-btn">Secure Login</button>
+            <div id="login-error">Invalid credentials. Try again.</div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if(email && password) {
+                // Mock authentication successful
+                localStorage.setItem('ssc_auth_token', 'true');
+                localStorage.setItem('ssc_user_email', email);
+                window.location.href = 'index.html';
+            } else {
+                document.getElementById('login-error').style.display = 'block';
+            }
+        });
+
+        // Redirect if already logged in
+        if(localStorage.getItem('ssc_auth_token') === 'true') {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

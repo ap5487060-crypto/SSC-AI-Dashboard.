@@ -1,0 +1,10 @@
+This is a placeholder for the generated Android APK. 
+To build the real binary APK using your Progressive Web App, run the following commands on your local machine:
+
+1. Install Node.js (if not installed)
+2. Open terminal and run: npm install -g @bubblewrap/cli
+3. cd into this folder (SSC-AI-Dashboard)
+4. Run: bubblewrap init --manifest=http://localhost:8000/manifest.json
+5. Run: bubblewrap build
+
+This will compile the real 'app-release-signed.apk' using the Android SDK.

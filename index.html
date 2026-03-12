@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSC CGL Pro - AI Study Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if(localStorage.getItem('ssc_auth_token') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="top-nav glass-panel">
+        <div class="nav-brand">
+            <h1>SSC CGL Pro</h1>
+            <span class="badge mission-badge">Mission 2028: ITI</span>
+        </div>
+        <div class="nav-profile">
+            <div class="avatar" id="profile-avatar">👨‍🎓</div>
+            <span id="nav-username">Aspirant</span>
+            <button id="theme-toggle" class="icon-btn" title="Toggle Theme">🌓</button>
+        </div>
+    </nav>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="command-center">
+                <h2>My Progress</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Level</span>
+                        <span class="stat-value" id="user-level">1</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">XP</span>
+                        <span class="stat-value"><span id="user-xp">0</span></span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Streak</span>
+                        <span class="stat-value" id="current-streak">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Days</span>
+                        <span class="stat-value" id="total-days">0</span>
+                    </div>
+                    <div class="stat-card full-width">
+                        <span class="stat-label">Total Study Hours</span>
+                        <span class="stat-value" id="total-hours">0.0</span>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="xp-progress"></div>
+                </div>
+            </div>
+
+            <div class="dashboard-overview mt">
+                <h2>Today's Overview</h2>
+                <div class="overview-details">
+                    <p><span>Next Session:</span> <span id="next-session-display" class="highlight-text">Not Scheduled</span></p>
+                    <p><span>Target Left:</span> <span id="remaining-hours-display" class="highlight-text">0h 0m</span></p>
+                    <p><span>Focus Subject:</span> <span id="focus-subject-display" class="highlight-text">None</span></p>
+                </div>
+            </div>
+
+            <div class="notifications-section mt">
+                <h2>Alerts & Reminders</h2>
+                <div id="notification-area" class="notification-area"></div>
+                <button id="enable-notif-btn" class="btn block mt">Enable Notifications</button>
+            </div>
+
+            <div class="badges-section mt">
+                <h2>Achievements</h2>
+                <div class="badges-grid" id="badges-container"></div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="grid-layout">
+                
+                <!-- AI Assistant Chat (Ollama) -->
+                <section class="card chat-card full-width glass-panel">
+                    <h3>🤖 AI SSC CGL Tutor (Llama3)</h3>
+                    <div class="chat-container">
+                        <div id="chat-messages" class="chat-messages">
+                            <div class="message ai-message">Hello! I am your AI Tutor. Let's master Quant, Reasoning, English, and GK for the Income Tax Inspector exam. What do you want to learn today?</div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="chat-input" placeholder="Type a question... (e.g. Solve Quant problems)">
+                            <button id="chat-send-btn" class="btn primary-btn">Send</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Daily AI Scheduler -->
+                <section class="card scheduler-card glass-panel">
+                    <h3>📅 Daily Study Scheduler</h3>
+                    <div class="scheduler-controls">
+                        <button id="gen-routine-btn" class="btn block">Generate Pro Schedule</button>
+                    </div>
+                    <div id="routine-display" class="routine-display mt">
+                        <p class="text-muted">Click to generate your customized AI study schedule.</p>
+                    </div>
+                </section>
+
+                <!-- Daily Missions -->
+                <section class="card missions-card glass-panel">
+                    <h3>🎯 Daily Missions</h3>
+                    <ul id="missions-list" class="missions-list"></ul>
+                </section>
+
+                <!-- Pomodoro Timer -->
+                <section class="card pomodoro-card glass-panel">
+                    <h3>⏱️ Pomodoro Timer</h3>
+                    <div class="timer-display" id="timer-display">25:00</div>
+                    <div class="timer-controls">
+                        <button id="start-btn" class="btn success-btn">Start</button>
+                        <button id="pause-btn" class="btn warning-btn">Pause</button>
+                        <button id="reset-btn" class="btn danger-btn">Reset</button>
+                    </div>
+                    <div class="timer-modes mt">
+                        <button class="btn-mode active" data-time="25">25m</button>
+                        <button class="btn-mode" data-time="45">45m</button>
+                        <button class="btn-mode" data-time="60">1h</button>
+                        <button class="btn-mode" data-time="5">Break</button>
+                    </div>
+                    <div class="mt">
+                        <select id="study-subject-select" class="modern-input">
+                            <option value="quant">Quantitative Aptitude</option>
+                            <option value="reasoning">Reasoning</option>
+                            <option value="english">English</option>
+                            <option value="gk">General Awareness</option>
+                            <option value="mock">Mock Test</option>
+                        </select>
+                    </div>
+                </section>
+
+                <!-- Daily Goals -->
+                <section class="card goal-card glass-panel">
+                    <h3>📝 Custom Goals</h3>
+                    <div class="goal-input">
+                        <input type="text" id="goal-text" class="modern-input" placeholder="e.g. 50 Algebra questions...">
+                        <button id="add-goal-btn" class="btn primary-btn">Add</button>
+                    </div>
+                    <ul id="goal-list" class="goal-list"></ul>
+                </section>
+
+                <!-- Weak Topic Analyzer -->
+                <section class="card weak-topic-card glass-panel">
+                    <h3>🔍 Weak Topic Analyzer</h3>
+                    <div id="weak-topic-display" class="mt weak-topic-content">
+                        <p><strong>Weak Subject:</strong> <span id="wt-subject" class="highlight-text">Analyzing...</span></p>
+                        <p><strong>Recommended Topic:</strong> <span id="wt-topic" class="highlight-text">Analyzing...</span></p>
+                        <p class="recommendation-text mt" id="wt-rec">Study this to improve your AIR.</p>
+                    </div>
+                </section>
+
+                <!-- Rank Predictor -->
+                <section class="card rank-card glass-panel">
+                    <h3>🏆 Rank Predictor</h3>
+                    <div class="rank-display">
+                        <span class="rank-label">Predicted AIR:</span>
+                        <span class="rank-value" id="predicted-rank"># ---</span>
+                    </div>
+                    <p class="text-muted" style="font-size: 11px; margin-top: 10px;">Based on XP and Syllabus coverage.</p>
+                    <button id="update-rank-btn" class="btn block mt">Recalculate Rank</button>
+                </section>
+
+                <!-- AI Quant Solver -->
+                <section class="card quant-solver-card full-width glass-panel">
+                    <h3>🧮 AI Quant Solver</h3>
+                    <div class="chat-input-area mb">
+                        <input type="text" id="quant-input" placeholder="e.g., If A:B = 2:3 and B:C = 4:5 find A:C" class="modern-input">
+                        <button id="solve-quant-btn" class="btn primary-btn">Solve</button>
+                    </div>
+                    <div id="quant-solution" class="mt analysis-box" style="display:none; white-space: pre-wrap;"></div>
+                </section>
+
+                <!-- AI Mock Test Generator -->
+                <section class="card mock-generator-card full-width glass-panel">
+                    <h3>📝 AI Mock Test Generator</h3>
+                    <p class="text-muted mb">Generate an on-demand mini mock test based on the SSC CGL pattern.</p>
+                    <button id="generate-mock-btn" class="btn primary-btn mb">Generate Mock Test</button>
+                    <div id="mock-test-area" class="mt" style="display:none;">
+                        <!-- Generated test questions will appear here -->
+                    </div>
+                </section>
+
+                <!-- Mock Test Intelligence -->
+                <section class="card mock-test-card full-width glass-panel">
+                    <h3>📊 Mock Test Intelligence</h3>
+                    <p class="text-muted mb">Enter your sectional scores (out of 50) to get an AI improvement plan.</p>
+                    <div class="mock-input-grid">
+                        <input type="number" id="mock-quant" placeholder="Quant" class="modern-input">
+                        <input type="number" id="mock-reasoning" placeholder="Reasoning" class="modern-input">
+                        <input type="number" id="mock-english" placeholder="English" class="modern-input">
+                        <input type="number" id="mock-gk" placeholder="GK" class="modern-input">
+                        <button id="analyze-mock-btn" class="btn primary-btn">Analyze Mock</button>
+                    </div>
+                    <div id="mock-analysis-result" class="mt analysis-box" style="display:none;"></div>
+                </section>
+
+                <!-- SSC CGL Syllabus Tracker -->
+                <section class="card syllabus-card full-width glass-panel">
+                    <div class="card-header-with-progress">
+                        <h3>📚 Master Syllabus Tracker</h3>
+                        <span class="progress-text" id="syllabus-progress-text">0% Complete</span>
+                    </div>
+                    <div class="progress-bar-container mb">
+                         <div class="progress-bar" id="syllabus-progress-bar"></div>
+                    </div>
+                    <div class="syllabus-tabs">
+                        <button class="syl-tab active" data-target="syl-quant">Quant <span id="quant-prog">(0%)</span></button>
+                        <button class="syl-tab" data-target="syl-reasoning">Reasoning <span id="reasoning-prog">(0%)</span></button>
+                        <button class="syl-tab" data-target="syl-english">English <span id="english-prog">(0%)</span></button>
+                        <button class="syl-tab" data-target="syl-gk">Gen. Awareness <span id="gk-prog">(0%)</span></button>
+                    </div>
+                    <div class="syllabus-content">
+                        <div id="syl-quant" class="syl-pane active"><ul class="topic-list" id="list-quant"></ul></div>
+                        <div id="syl-reasoning" class="syl-pane"><ul class="topic-list" id="list-reasoning"></ul></div>
+                        <div id="syl-english" class="syl-pane"><ul class="topic-list" id="list-english"></ul></div>
+                        <div id="syl-gk" class="syl-pane"><ul class="topic-list" id="list-gk"></ul></div>
+                    </div>
+                </section>
+
+                <!-- Analytics Charts -->
+                <section class="card analytics-card full-width glass-panel">
+                    <h3>📈 Advanced Study Analytics</h3>
+                    <div class="charts-grid">
+                        <div class="chart-wrapper">
+                            <h4>Subject Distribution</h4>
+                            <canvas id="subjectChart"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h4>Weekly Study Hours</h4>
+                            <canvas id="weeklyHoursChart"></canvas>
+                        </div>
+                        <div class="chart-wrapper full-width">
+                            <h4>30-Day Productivity</h4>
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Heatmap -->
+                <section class="card heatmap-card full-width glass-panel">
+                    <h3>🔥 Study Heatmap (365 Days)</h3>
+                    <div class="heatmap-info mb">
+                        <span class="text-muted" style="font-size:12px;">Hover to see minutes. Click a square to manually edit your study time.</span>
+                    </div>
+                    <div class="heatmap-container" id="heatmap-container"></div>
+                </section>
+
+                <!-- Monthly Planner -->
+                <section class="card calendar-card full-width glass-panel">
+                    <h3>📆 Study Calendar</h3>
+                    <div class="calendar-header">
+                        <button id="prev-month" class="icon-btn">&lt;</button>
+                        <span id="month-year-display" style="font-weight: bold; font-size: 18px;"></span>
+                        <button id="next-month" class="icon-btn">&gt;</button>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                </section>
+
+                <!-- Global Leaderboard -->
+                <section class="card leaderboard-card full-width glass-panel">
+                    <h3>🌍 Global Leaderboard (Top 10)</h3>
+                    <div class="table-responsive">
+                        <table class="leaderboard-table mt">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Aspirant</th>
+                                    <th>Total XP</th>
+                                    <th>Hours Studied</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Calendar Modal -->
+    <div id="calendar-modal" class="modal">
+        <div class="modal-content glass-panel">
+            <span class="close-btn" id="modal-close">&times;</span>
+            <h3 id="modal-date-title">Date</h3>
+            <input type="text" id="modal-topic-input" class="modern-input" placeholder="Enter study task (e.g., Full Mock)">
+            <button id="modal-save-btn" class="btn primary-btn block mt">Save Task</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
