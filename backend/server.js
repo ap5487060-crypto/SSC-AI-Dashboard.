@@ -7,15 +7,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyDQCnNqsoAsxlfpbumCpsigCbevNAt5l1A"; // Provided in prompt context
+const PORT = process.env.PORT || 10000;
+// Using the provided Gemini API key
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyDQCnNqsoAsxlfpbumCpsigCbevNAt5l1A";
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// Helper function to call Ollama (local) with a fallback to Gemini
+/**
+ * CORE AI LOGIC
+ * Tries local Ollama first, then falls back to Gemini Cloud.
+ */
 async function generateAIResponse(prompt, systemInstruction = "") {
-    let finalPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
+    const finalPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
     
-    // Attempt Ollama first
+    // 1. Attempt Local Ollama (Only works if user is running it on their local machine and port is forwarded/available)
+    // Note: On Render, this will fail and trigger Gemini fallback.
     try {
         const ollamaResponse = await fetch("http://localhost:11434/api/generate", {
             method: "POST",
@@ -25,102 +30,78 @@ async function generateAIResponse(prompt, systemInstruction = "") {
                 prompt: finalPrompt,
                 stream: false
             }),
-            signal: AbortSignal.timeout(5000) // 5s timeout for local check
+            signal: AbortSignal.timeout(3000) 
         });
 
         if (ollamaResponse.ok) {
-            const data = await ollamaResponse.json();
-            return { response: data.response, source: 'Ollama' };
+            const data = await ollamaResponse.ok ? await ollamaResponse.json() : null;
+            if (data && data.response) return { response: data.response, source: 'Ollama (Local)' };
         }
     } catch (error) {
-        console.log("Ollama unavailable or timed out. Falling back to Gemini API...");
+        console.log("Local AI unavailable. Routing to Cloud AI...");
     }
 
-    // Fallback to Gemini
+    // 2. Fallback to Google Gemini
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash",
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+        });
         const result = await model.generateContent(finalPrompt);
-        const responseText = result.response.text();
-        return { response: responseText, source: 'Gemini' };
-    } catch (geminiError) {
-        console.error("Gemini Error:", geminiError);
-        throw new Error("Both local AI and Cloud AI failed.");
+        return { response: result.response.text(), source: 'Gemini (Cloud)' };
+    } catch (err) {
+        console.error("AI Error:", err);
+        return { response: "I'm currently recalibrating my brain. Please try again in a few seconds!", source: 'System' };
     }
 }
 
-// 1. AI Chat Endpoint
+// --- API ENDPOINTS ---
+
+// AI Tutor Chat
 app.post('/ai-chat', async (req, res) => {
-    try {
-        const { message, weakSubject } = req.body;
-        const systemInstruction = `You are an expert SSC CGL tutor helping a student prepare for the Income Tax Inspector post. Help with Quant, Reasoning, English, and General Awareness. User's weakest subject is currently ${weakSubject ? weakSubject.toUpperCase() : 'UNKNOWN'}. Provide clear explanations, practice questions, and study advice. Answer in Hinglish if appropriate.`;
-        
-        const result = await generateAIResponse(`User Question: ${message}`, systemInstruction);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    const { message, weakSubject } = req.body;
+    const system = `You are a Pro SSC CGL Tutor for Mission 2028. Target: Income Tax Inspector. Help with Quant, Reasoning, English, and GK. User weakest subject: ${weakSubject || 'General'}. Answer clearly in Hinglish.`;
+    const result = await generateAIResponse(message, system);
+    res.json(result);
 });
 
-// 2. AI Quant Solver Endpoint
+// AI Quant Solver
 app.post('/solve-quant', async (req, res) => {
-    try {
-        const { problem } = req.body;
-        const systemInstruction = `You are an expert Quantitative Aptitude solver for SSC CGL. Solve the given math problem step-by-step. Provide the final answer clearly and explain the concept or shortcut trick used. Format with clear markdown headings like:
-### Step-by-Step Solution
-### Final Answer
-### Concept / Shortcut Trick`;
-        
-        const result = await generateAIResponse(`Problem: ${problem}`, systemInstruction);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    const { problem } = req.body;
+    const system = "You are a Quantitative Aptitude Expert. Solve the problem step-by-step with SSC shortcut tricks. Provide the final answer clearly.";
+    const result = await generateAIResponse(problem, system);
+    res.json(result);
 });
 
-// 3. AI Mock Test Generator Endpoint
+// AI Mock Test Generator
 app.post('/generate-mock', async (req, res) => {
+    const system = `Generate 4 Multiple Choice Questions for SSC CGL. 1 from each: Quant, Reasoning, English, GK. 
+    Format STRICTLY as a JSON array like: 
+    [{"subject":"Quant", "question":"...", "options":["A","B","C","D"], "correctAnswer":"A", "explanation":"..."}]`;
     try {
-        // Since generating 100 questions might be too slow for a synchronous request, we'll generate a "mini" mock or just 1 question per section for demonstration.
-        // Or we can request 4 questions (1 from each section)
-        const systemInstruction = `You are an SSC CGL Mock Test Generator. Generate exactly 4 Multiple Choice Questions (1 from Quant, 1 from Reasoning, 1 from English, 1 from General Awareness). 
-Format strictly as JSON without any markdown formatting block around it, in this format:
-[
-  { "subject": "Quant", "question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "A", "explanation": "..." },
-  ...
-]`;
-        
-        const result = await generateAIResponse("Generate a mini mock test.", systemInstruction);
-        
-        // Clean JSON from markdown block if AI adds it
-        let jsonStr = result.response.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const testData = JSON.parse(jsonStr);
-        
-        res.json({ test: testData, source: result.source });
-    } catch (error) {
-        res.status(500).json({ error: "Failed to generate mock test. " + error.message });
+        const result = await generateAIResponse("Generate test", system);
+        let cleaned = result.response.replace(/```json/gi, '').replace(/```/g, '').trim();
+        res.json({ test: JSON.parse(cleaned), source: result.source });
+    } catch (e) {
+        res.status(500).json({ error: "Failed to generate mock test." });
     }
 });
 
-// 4. Weak Topic Analyzer Endpoint
+// Weak Topic Analyzer
 app.post('/weak-topic', async (req, res) => {
-    try {
-        const { studyData, mockScores } = req.body;
-        const systemInstruction = `You are an AI Study Coach for SSC CGL. Analyze the user's data:
-Study Minutes: ${JSON.stringify(studyData)}
-Mock Scores: ${JSON.stringify(mockScores)}
-
-Identify the weakest subject and a specific recommended topic to focus on. Return a clean short message. Example:
-Weak Subject: Quant
-Recommended Topic: Algebra
-Action: Practice 20 questions today.`;
-
-        const result = await generateAIResponse("Analyze my study data and give a recommendation.", systemInstruction);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    const { studyData } = req.body;
+    const system = `Analyze this study data (minutes): ${JSON.stringify(studyData)}. 
+    Suggest exactly 3 lines:
+    1. Weakest Subject
+    2. Recommended Topic
+    3. Action Plan`;
+    const result = await generateAIResponse("Analyze data", system);
+    res.json(result);
 });
 
-app.listen(PORT, () => {
-    console.log(`AI Backend Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Backend live on port ${PORT}`));
